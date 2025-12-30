@@ -17,12 +17,18 @@
 #
 # Single subreddit mode:
 #   make single SUBREDDIT=ClaudeAI TOP=10
-#   make fetch SUBREDDIT=LocalLLaMA TOP=5
+#   make single SUBREDDIT=ClaudeAI TOP=15 FETCH=50
 #
-# After fetching, run Claude Code to generate the digest.
+# Parameters:
+#   TOP=N     - Number of posts in final report (default: 10)
+#   FETCH=N   - Number of source posts to analyze (default: 50)
+#
+# Report generation:
+#   make report               - Re-generate report from existing data
+#   make report-interactive   - Re-generate report with full Claude UI
 #
 
-.PHONY: all install fetch clean help daily weekly monthly single
+.PHONY: all install fetch clean help daily weekly monthly single report report-interactive
 
 # Default target
 all: help
@@ -47,8 +53,10 @@ ifdef SUBREDDIT
     SUBREDDIT_ARG = --subreddit $(SUBREDDIT)
 endif
 
-# Top posts count (default 50 for preprocessing, override with TOP=N)
-TOP ?= 50
+# FETCH = number of source posts to preprocess/analyze (default 50)
+FETCH ?= 50
+# TOP = number of posts to include in final report (default 10)
+TOP ?= 10
 
 # Output directory naming
 # MODE is set by targets (daily, weekly, monthly, single)
@@ -91,7 +99,7 @@ fetch:
 	$(PYTHON) scripts/fetch_reddit.py $(TIME_ARGS) $(SUBREDDIT_ARG) --output-dir $(OUTPUT_DIR)
 	@echo ""
 	@echo "Preprocessing posts..."
-	$(PYTHON) scripts/preprocess.py --top $(TOP) --output-dir $(OUTPUT_DIR)
+	$(PYTHON) scripts/preprocess.py --top $(FETCH) --output-dir $(OUTPUT_DIR)
 	@echo ""
 	@echo "Updating latest symlink..."
 	@rm -f output/latest
@@ -112,28 +120,31 @@ clean:
 # Convenience shortcuts
 # ============================================================
 
-## daily: Fetch last 24 hours
+## daily: Fetch last 24 hours and generate report
 daily:
 	@START=$$(date -u -v-1d +%Y-%m-%dT%H:%M:%SZ 2>/dev/null || date -u -d "1 day ago" +%Y-%m-%dT%H:%M:%SZ); \
 	END=$$(date -u +%Y-%m-%dT%H:%M:%SZ); \
 	echo "Fetching daily data: $$START to $$END"; \
 	$(MAKE) fetch START=$$START END=$$END MODE=daily SUBREDDIT=$(SUBREDDIT) TOP=$(TOP)
+	@$(MAKE) report
 
-## weekly: Fetch last 7 days
+## weekly: Fetch last 7 days and generate report
 weekly:
 	@START=$$(date -u -v-7d +%Y-%m-%dT%H:%M:%SZ 2>/dev/null || date -u -d "7 days ago" +%Y-%m-%dT%H:%M:%SZ); \
 	END=$$(date -u +%Y-%m-%dT%H:%M:%SZ); \
 	echo "Fetching weekly data: $$START to $$END"; \
 	$(MAKE) fetch START=$$START END=$$END MODE=weekly SUBREDDIT=$(SUBREDDIT) TOP=$(TOP)
+	@$(MAKE) report
 
-## monthly: Fetch last 30 days
+## monthly: Fetch last 30 days and generate report
 monthly:
 	@START=$$(date -u -v-30d +%Y-%m-%dT%H:%M:%SZ 2>/dev/null || date -u -d "30 days ago" +%Y-%m-%dT%H:%M:%SZ); \
 	END=$$(date -u +%Y-%m-%dT%H:%M:%SZ); \
 	echo "Fetching monthly data: $$START to $$END"; \
 	$(MAKE) fetch START=$$START END=$$END MODE=monthly SUBREDDIT=$(SUBREDDIT) TOP=$(TOP)
+	@$(MAKE) report
 
-## single: Fetch top posts from a single subreddit (use SUBREDDIT=name TOP=N)
+## single: Fetch top posts from a single subreddit and generate report (use SUBREDDIT=name TOP=N)
 single:
 ifndef SUBREDDIT
 	@echo "Error: SUBREDDIT is required"
@@ -144,6 +155,43 @@ endif
 	END=$$(date -u +%Y-%m-%dT%H:%M:%SZ); \
 	echo "Fetching top $(TOP) posts from r/$(SUBREDDIT): $$START to $$END"; \
 	$(MAKE) fetch START=$$START END=$$END SUBREDDIT=$(SUBREDDIT) TOP=$(TOP) MODE=single
+	@$(MAKE) report
+
+## report: Generate digest report using Claude Code (requires data in output/latest)
+report:
+	@if [ ! -f "output/latest/processed_posts.json" ]; then \
+		echo "Error: No data found at output/latest/processed_posts.json"; \
+		echo "Run 'make single SUBREDDIT=X' or 'make weekly' first."; \
+		exit 1; \
+	fi
+	@echo "Generating digest report with Claude Code..."
+	@START_TIME=$$(date +%s); \
+	claude --print --model sonnet --verbose --dangerously-skip-permissions --output-format stream-json \
+		"Read the file $(CURDIR)/output/latest/processed_posts.json and $(CURDIR)/agents/weekly_digest_agent.md, then generate the digest report following the agent instructions. Include the top $(TOP) posts in the report. Save it to $(CURDIR)/output/latest/report.md" \
+		| $(PYTHON) scripts/format_progress.py; \
+	END_TIME=$$(date +%s); \
+	ELAPSED=$$((END_TIME - START_TIME)); \
+	MINS=$$((ELAPSED / 60)); \
+	SECS=$$((ELAPSED % 60)); \
+	echo ""; \
+	echo "=========================================="; \
+	echo "Report generated: output/latest/report.md"; \
+	echo "Time elapsed: $${MINS}m $${SECS}s"; \
+	echo "=========================================="
+
+## report-interactive: Generate report with full interactive Claude UI
+report-interactive:
+	@if [ ! -f "output/latest/processed_posts.json" ]; then \
+		echo "Error: No data found at output/latest/processed_posts.json"; \
+		echo "Run 'make single SUBREDDIT=X' or 'make weekly' first."; \
+		exit 1; \
+	fi
+	@echo "Launching Claude Code interactively..."
+	@claude "Read the file output/latest/processed_posts.json and agents/weekly_digest_agent.md, then generate the digest report following the agent instructions and save it to output/latest/report.md"
+	@echo ""
+	@echo "=========================================="
+	@echo "Report generated: output/latest/report.md"
+	@echo "=========================================="
 
 # ============================================================
 # Help

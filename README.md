@@ -230,3 +230,28 @@ This guide covers:
 - **Security best practices**: How to handle credentials safely
 
 The documentation provides recommendations and examples without requiring implementation, so you can choose the approach that best fits your needs.
+
+## License
+
+MIT License - see LICENSE file
+
+## Version History
+
+**1.0.0** - 2025-01-15 - Initial release
+
+* Reddit integration with multi-subreddit support
+* Engagement-based scoring and ranking system
+* Relevance scoring based on customizable interests
+* Claude Code integration for digest generation
+* Single subreddit mode for focused digests
+* Timestamped output archives with symlink support
+* Comprehensive configuration system
+* Technical documentation and automation guides
+
+## About
+
+**Created by Eric Blue**
+
+Content Digest is a local-first system that curates and summarizes discussions from multiple platforms on any topic you choose, using Claude Code. It provides a portable, tool-agnostic approach to staying informed about topics that matter to you.
+
+This project addresses the challenge of information overload by providing intelligent curation and summarization of content from platforms like Reddit, with plans to expand to Twitter/X, LinkedIn, and other platforms.

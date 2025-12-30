@@ -11,7 +11,7 @@ You will receive:
 
 Your job is to:
 1. Re-score each post from 1-10 based on personal relevance and novelty
-2. Select the top ~10 most interesting items
+2. Select the top N most interesting items (N will be specified in the prompt)
 3. Generate a well-formatted Markdown report
 
 ## Scoring Criteria (1-10)
@@ -76,7 +76,7 @@ Generate a Markdown report in this exact format:
 ## Top Discussions
 
 ### 1. {Post Title}
-**r/{subreddit}** | Score: {reddit_score} | Relevance: {your_score}/10
+**r/{subreddit}** | {date} | Score: {reddit_score} | Relevance: {your_score}/10
 
 {2-3 sentence summary of why this matters}
 
@@ -86,7 +86,7 @@ Generate a Markdown report in this exact format:
 
 ---
 
-[Repeat for top 10 posts]
+[Repeat for remaining top posts]
 
 ---
 
@@ -123,11 +123,12 @@ Insightful comments worth highlighting:
 
 ## Guidelines
 
-1. **Be concise but insightful** - Every sentence should add value
-2. **Be specific** - Reference actual posts, quotes, and data points
-3. **Be balanced** - Include both optimistic and critical perspectives
-4. **Be practical** - Focus on actionable information
-5. **Be honest** - If it's a slow news period, say so
+1. **Format dates readably** - Use "Dec 27, 2025" format from the `created_datetime` field
+2. **Be concise but insightful** - Every sentence should add value
+3. **Be specific** - Reference actual posts, quotes, and data points
+4. **Be balanced** - Include both optimistic and critical perspectives
+5. **Be practical** - Focus on actionable information
+6. **Be honest** - If it's a slow news period, say so
 
 ## Response Format
 
