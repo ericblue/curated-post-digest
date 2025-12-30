@@ -9,17 +9,23 @@ A local-first system that curates and summarizes discussions from multiple platf
 ## Quick Start
 
 ```bash
-cd weekly-ai-reddit-digest
+# Clone the repository (or navigate to your project directory)
+git clone https://github.com/ericblue/curated-post-digest.git
+cd curated-post-digest
 
 # Install dependencies
 pip install -r requirements.txt
 
-# Fetch last 7 days of posts
+# Fetch last 7 days of posts and generate digest (automatic)
 make weekly
-
-# Then ask Claude Code to generate the digest:
-# "Read output/processed_posts.json and agents/weekly_digest_agent.md, generate the digest and save to output/report.md"
 ```
+
+The `make weekly` command automatically:
+1. Fetches posts from configured subreddits
+2. Preprocesses and scores the posts
+3. Generates the digest report using Claude Code
+
+The report will be saved to `output/latest/report.md`.
 
 ## How It Works
 
@@ -96,14 +102,13 @@ The `latest` symlink always points to the most recent run, so you can always fin
 
 ### Generate Digest
 
-After fetching, tell Claude Code:
+The digest is **automatically generated** when you run `make weekly`, `make daily`, `make monthly`, or `make single`. The report will be saved to `output/latest/report.md`.
 
-> Read output/latest/processed_posts.json and agents/weekly_digest_agent.md, then generate the digest report and save it to output/latest/report.md
-
-Or in one command with Claude Code:
+If you need to regenerate the report from existing data:
 
 ```bash
-claude "cd weekly-ai-reddit-digest && make weekly && read output/latest/processed_posts.json and agents/weekly_digest_agent.md, generate the digest and save to output/latest/report.md"
+# Regenerate report from output/latest/processed_posts.json
+make report
 ```
 
 ## Configuration
@@ -172,7 +177,7 @@ interests:
 ## Project Structure
 
 ```
-weekly-ai-reddit-digest/
+curated-post-digest/
 ├── Makefile                    # make weekly, make daily, etc.
 ├── config.yaml                 # Subreddits and settings
 ├── requirements.txt            # Python dependencies
@@ -237,7 +242,7 @@ MIT License - see LICENSE file
 
 ## Version History
 
-**1.0.0** - 2025-01-15 - Initial release
+**1.0.0** - 2025-12-30 - Initial release
 
 * Reddit integration with multi-subreddit support
 * Engagement-based scoring and ranking system
@@ -250,7 +255,7 @@ MIT License - see LICENSE file
 
 ## About
 
-**Created by Eric Blue**
+**Created by [Eric Blue](https://about.ericblue.com)**
 
 Content Digest is a local-first system that curates and summarizes discussions from multiple platforms on any topic you choose, using Claude Code. It provides a portable, tool-agnostic approach to staying informed about topics that matter to you.
 
