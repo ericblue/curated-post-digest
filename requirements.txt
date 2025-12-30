@@ -1,0 +1,15 @@
+# AI Reddit Digest - Python Dependencies
+# =======================================
+# Install with: pip install -r requirements.txt
+
+# Reddit API client
+praw>=7.7.0
+
+# HTTP requests (for unauthenticated fallback)
+requests>=2.31.0
+
+# YAML configuration parsing
+pyyaml>=6.0.1
+
+# Date/time handling
+python-dateutil>=2.8.2

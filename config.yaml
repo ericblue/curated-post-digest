@@ -1,0 +1,86 @@
+# AI Reddit Digest Configuration
+# ================================
+# Edit this file to customize your digest preferences
+
+# Reddit API credentials (required for authenticated access)
+# Get yours at: https://www.reddit.com/prefs/apps
+# For unauthenticated access (rate limited), leave these empty
+reddit:
+  client_id: ""
+  client_secret: ""
+  user_agent: "AI-Reddit-Digest/1.0"
+
+# Subreddits to monitor
+# Add or remove subreddits as desired (without the r/ prefix)
+subreddits:
+  - MachineLearning
+  - Artificial
+  - ChatGPT
+  - LocalLLaMA
+  - ClaudeAI
+  - OpenAI
+  - Futurology
+  - singularity
+  - StableDiffusion
+  - learnmachinelearning
+
+# Default time window (used if no CLI args provided)
+# Format: ISO-8601 (e.g., 2025-01-01T00:00:00Z)
+# Leave empty to default to "last 7 days ending now"
+time_window:
+  start: ""
+  end: ""
+  default_days: 7
+
+# Fetch settings
+fetch:
+  # Maximum posts to fetch per subreddit
+  max_posts_per_subreddit: 50
+  # Maximum comments per post to fetch
+  max_comments_per_post: 20
+  # Minimum score threshold for posts (filters low-quality content)
+  min_score: 5
+  # Rate limit delay between requests (seconds)
+  rate_limit_delay: 2
+
+# Scoring weights for "interesting" heuristic
+# These affect how posts are ranked (higher = more important)
+scoring:
+  # Weight for Reddit score (upvotes - downvotes)
+  engagement_weight: 0.3
+  # Weight for comment count
+  comments_weight: 0.25
+  # Weight for novelty (Claude-assessed)
+  novelty_weight: 0.25
+  # Weight for relevance to AI/LLM topics (Claude-assessed)
+  relevance_weight: 0.2
+
+# Topics of personal interest (used by Claude for relevance scoring)
+interests:
+  - Large Language Models (LLMs)
+  - AI agents and autonomous systems
+  - Open source AI tools
+  - Developer tooling for AI
+  - Practical AI experimentation
+  - Local/self-hosted AI
+  - AI safety and alignment
+  - Prompt engineering
+  - RAG and retrieval systems
+  - AI coding assistants
+
+# Output settings
+output:
+  # Path to output report (relative to project root)
+  report_path: "output/report.md"
+  # Number of top posts to include in digest
+  top_posts: 10
+  # Include raw JSON data in output directory
+  save_raw_data: true
+
+# Claude settings (for summarization)
+claude:
+  # Model to use for summarization
+  model: "claude-sonnet-4-20250514"
+  # Maximum tokens for summary response
+  max_tokens: 4096
+
