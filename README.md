@@ -1,4 +1,4 @@
-# Content Digest
+# Curated Post Digest
 
 A local-first system that curates and summarizes discussions from multiple platforms on any topic you choose, using Claude Code.
 
@@ -257,6 +257,6 @@ MIT License - see LICENSE file
 
 **Created by [Eric Blue](https://about.ericblue.com)**
 
-Content Digest is a local-first system that curates and summarizes discussions from multiple platforms on any topic you choose, using Claude Code. It provides a portable, tool-agnostic approach to staying informed about topics that matter to you.
+Curated Post Digest is a local-first system that curates and summarizes discussions from multiple platforms on any topic you choose, using Claude Code. It provides a portable, tool-agnostic approach to staying informed about topics that matter to you.
 
 This project addresses the challenge of information overload by providing intelligent curation and summarization of content from platforms like Reddit, with plans to expand to Twitter/X, LinkedIn, and other platforms.

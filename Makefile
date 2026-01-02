@@ -167,7 +167,7 @@ report:
 	@echo "Generating digest report with Claude Code..."
 	@START_TIME=$$(date +%s); \
 	claude --print --model sonnet --verbose --dangerously-skip-permissions --output-format stream-json \
-		"Read the file $(CURDIR)/output/latest/processed_posts.json and $(CURDIR)/agents/weekly_digest_agent.md, then generate the digest report following the agent instructions. Include the top $(TOP) posts in the report. Save it to $(CURDIR)/output/latest/report.md" \
+		"Read the files $(CURDIR)/output/latest/processed_posts.json, $(CURDIR)/agents/weekly_digest_agent.md, and $(CURDIR)/config.yaml, then generate the digest report following the agent instructions. Include the top $(TOP) posts in the report. Save it to $(CURDIR)/output/latest/report.md" \
 		| $(PYTHON) scripts/format_progress.py; \
 	END_TIME=$$(date +%s); \
 	ELAPSED=$$((END_TIME - START_TIME)); \
@@ -187,7 +187,7 @@ report-interactive:
 		exit 1; \
 	fi
 	@echo "Launching Claude Code interactively..."
-	@claude "Read the file output/latest/processed_posts.json and agents/weekly_digest_agent.md, then generate the digest report following the agent instructions and save it to output/latest/report.md"
+	@claude "Read the files output/latest/processed_posts.json, agents/weekly_digest_agent.md, and config.yaml, then generate the digest report following the agent instructions and save it to output/latest/report.md"
 	@echo ""
 	@echo "=========================================="
 	@echo "Report generated: output/latest/report.md"

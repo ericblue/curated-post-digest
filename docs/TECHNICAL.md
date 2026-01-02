@@ -783,3 +783,4 @@ The AI Reddit Digest system demonstrates a **local-first, Claude Code-native** a
 
 The three-phase architecture (Fetch → Preprocess → Digest) provides clear separation of concerns, making the system maintainable and extensible.
 
+

@@ -14,15 +14,20 @@ reddit:
 # Add or remove subreddits as desired (without the r/ prefix)
 subreddits:
   - MachineLearning
-  - Artificial
-  - ChatGPT
   - LocalLLaMA
-  - ClaudeAI
+  - LLM
+  - mlOps
+  - ClaudeCode
+  - LangChain
+  - LlamaIndex
+  - LlamaIndex
+  - AIagents
+  - OpenSourceAI
   - OpenAI
-  - Futurology
-  - singularity
+  - ClaudeAI
   - StableDiffusion
-  - learnmachinelearning
+  - SelfHostedAI
+  - ClaudeCode
 
 # Default time window (used if no CLI args provided)
 # Format: ISO-8601 (e.g., 2025-01-01T00:00:00Z)
@@ -58,16 +63,16 @@ scoring:
 # Topics of personal interest (used by Claude for relevance scoring)
 interests:
   - Large Language Models (LLMs)
-  - AI agents and autonomous systems
-  - Open source AI tools
-  - Developer tooling for AI
-  - Practical AI experimentation
-  - Local/self-hosted AI
-  - AI safety and alignment
-  - Prompt engineering
-  - RAG and retrieval systems
-  - AI coding assistants
-
+  - Agentic AI and orchestration frameworks
+  - Open-source AI tooling and infra
+  - AI developer experience (DX)
+  - Practical experimentation and prototypes
+  - Local and self-hosted AI systems
+  - Retrieval, RAG, and hybrid search
+  - Reliability, evals, and failure modes
+  - AI coding assistants and copilots
+  - Agentic coding workflows (Claude Code, Cursor, etc.)
+  
 # Output settings
 output:
   # Path to output report (relative to project root)
