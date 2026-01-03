@@ -20,9 +20,10 @@
 #   make single SUBREDDIT=ClaudeAI TOP=15 FETCH=50
 #
 # Parameters:
-#   TOP=N     - Number of posts in final report (default: 10)
-#   FETCH=N   - Number of source posts to analyze (default: 50)
-#   CONFIG=P  - Path to config file (default: config.yaml)
+#   TOP=N        - Number of posts in final report (default: 10)
+#   FETCH=N      - Number of source posts to analyze (default: 50)
+#   MAX_POSTS=N  - Maximum posts to fetch per subreddit (default: from config)
+#   CONFIG=P     - Path to config file (default: config.yaml)
 #
 # Report generation:
 #   make report               - Re-generate report from existing data
@@ -57,10 +58,17 @@ ifdef SUBREDDIT
     SUBREDDIT_ARG = --subreddit $(SUBREDDIT)
 endif
 
+# Max posts per subreddit
+ifdef MAX_POSTS
+    MAX_POSTS_ARG = --max-posts $(MAX_POSTS)
+endif
+
 # FETCH = number of source posts to preprocess/analyze (default 50)
 FETCH ?= 50
 # TOP = number of posts to include in final report (default 10)
 TOP ?= 10
+# MAX_POSTS = maximum posts to fetch per subreddit (default: from config, typically 50)
+MAX_POSTS ?=
 
 # Output directory naming
 # MODE is set by targets (daily, weekly, monthly, single)
@@ -100,7 +108,7 @@ fetch:
 	@echo "Output directory: $(OUTPUT_DIR)"
 	@mkdir -p $(OUTPUT_DIR)
 	@echo "Fetching Reddit posts..."
-	$(PYTHON) scripts/fetch_reddit.py $(TIME_ARGS) $(SUBREDDIT_ARG) --config $(CONFIG) --output-dir $(OUTPUT_DIR)
+	$(PYTHON) scripts/fetch_reddit.py $(TIME_ARGS) $(SUBREDDIT_ARG) $(MAX_POSTS_ARG) --config $(CONFIG) --output-dir $(OUTPUT_DIR)
 	@echo ""
 	@echo "Preprocessing posts..."
 	$(PYTHON) scripts/preprocess.py --config $(CONFIG) --top $(FETCH) --output-dir $(OUTPUT_DIR)
@@ -129,7 +137,7 @@ daily:
 	@START=$$(date -u -v-1d +%Y-%m-%dT%H:%M:%SZ 2>/dev/null || date -u -d "1 day ago" +%Y-%m-%dT%H:%M:%SZ); \
 	END=$$(date -u +%Y-%m-%dT%H:%M:%SZ); \
 	echo "Fetching daily data: $$START to $$END"; \
-	$(MAKE) fetch START=$$START END=$$END MODE=daily SUBREDDIT=$(SUBREDDIT) TOP=$(TOP) CONFIG=$(CONFIG)
+	$(MAKE) fetch START=$$START END=$$END MODE=daily SUBREDDIT=$(SUBREDDIT) TOP=$(TOP) MAX_POSTS=$(MAX_POSTS) CONFIG=$(CONFIG)
 	@$(MAKE) report CONFIG=$(CONFIG)
 
 ## weekly: Fetch last 7 days and generate report
@@ -137,7 +145,7 @@ weekly:
 	@START=$$(date -u -v-7d +%Y-%m-%dT%H:%M:%SZ 2>/dev/null || date -u -d "7 days ago" +%Y-%m-%dT%H:%M:%SZ); \
 	END=$$(date -u +%Y-%m-%dT%H:%M:%SZ); \
 	echo "Fetching weekly data: $$START to $$END"; \
-	$(MAKE) fetch START=$$START END=$$END MODE=weekly SUBREDDIT=$(SUBREDDIT) TOP=$(TOP) CONFIG=$(CONFIG)
+	$(MAKE) fetch START=$$START END=$$END MODE=weekly SUBREDDIT=$(SUBREDDIT) TOP=$(TOP) MAX_POSTS=$(MAX_POSTS) CONFIG=$(CONFIG)
 	@$(MAKE) report CONFIG=$(CONFIG)
 
 ## monthly: Fetch last 30 days and generate report
@@ -145,7 +153,7 @@ monthly:
 	@START=$$(date -u -v-30d +%Y-%m-%dT%H:%M:%SZ 2>/dev/null || date -u -d "30 days ago" +%Y-%m-%dT%H:%M:%SZ); \
 	END=$$(date -u +%Y-%m-%dT%H:%M:%SZ); \
 	echo "Fetching monthly data: $$START to $$END"; \
-	$(MAKE) fetch START=$$START END=$$END MODE=monthly SUBREDDIT=$(SUBREDDIT) TOP=$(TOP) CONFIG=$(CONFIG)
+	$(MAKE) fetch START=$$START END=$$END MODE=monthly SUBREDDIT=$(SUBREDDIT) TOP=$(TOP) MAX_POSTS=$(MAX_POSTS) CONFIG=$(CONFIG)
 	@$(MAKE) report CONFIG=$(CONFIG)
 
 ## single: Fetch top posts from a single subreddit and generate report (use SUBREDDIT=name TOP=N)
@@ -158,7 +166,7 @@ endif
 	@START=$$(date -u -v-7d +%Y-%m-%dT%H:%M:%SZ 2>/dev/null || date -u -d "7 days ago" +%Y-%m-%dT%H:%M:%SZ); \
 	END=$$(date -u +%Y-%m-%dT%H:%M:%SZ); \
 	echo "Fetching top $(TOP) posts from r/$(SUBREDDIT): $$START to $$END"; \
-	$(MAKE) fetch START=$$START END=$$END SUBREDDIT=$(SUBREDDIT) TOP=$(TOP) MODE=single CONFIG=$(CONFIG)
+	$(MAKE) fetch START=$$START END=$$END SUBREDDIT=$(SUBREDDIT) TOP=$(TOP) MODE=single MAX_POSTS=$(MAX_POSTS) CONFIG=$(CONFIG)
 	@$(MAKE) report CONFIG=$(CONFIG)
 
 ## report: Generate digest report using Claude Code (requires data in output/latest)
@@ -219,4 +227,5 @@ help:
 	@echo "  make single SUBREDDIT=ClaudeAI TOP=10"
 	@echo "  make weekly SUBREDDIT=LocalLLaMA TOP=5"
 	@echo "  make weekly CONFIG=config.prod.yaml"
+	@echo "  make weekly MAX_POSTS=100"
 	@echo ""

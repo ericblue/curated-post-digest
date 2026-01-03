@@ -463,11 +463,23 @@ def main():
         help='Fetch from a single subreddit only (overrides config)',
         default=None
     )
+    arg_parser.add_argument(
+        '--max-posts', '-m',
+        help='Maximum posts to fetch per subreddit (overrides config)',
+        type=int,
+        default=None
+    )
 
     args = arg_parser.parse_args()
 
     # Load config
     config = load_config(args.config)
+
+    # Override max_posts in config if CLI argument provided
+    if args.max_posts is not None:
+        if 'fetch' not in config:
+            config['fetch'] = {}
+        config['fetch']['max_posts_per_subreddit'] = args.max_posts
 
     # Get time window
     try:
