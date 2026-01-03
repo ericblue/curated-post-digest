@@ -22,7 +22,6 @@ Output:
 
 import argparse
 import json
-import os
 import sys
 import time
 from datetime import datetime, timezone
@@ -31,12 +30,16 @@ from typing import Dict, List, Optional, Any
 
 import praw
 import requests
-import yaml
 from prawcore.exceptions import ResponseException, OAuthException
 
 # Add parent directory to path for imports
 sys.path.insert(0, str(Path(__file__).parent))
-from parse_time_window import get_time_window, load_config, format_timestamp_iso
+from parse_time_window import get_time_window, load_config
+
+# Content length limits
+MAX_SELFTEXT_LENGTH = 2000
+MAX_COMMENT_BODY_LENGTH = 1000
+REDDIT_API_MAX_LIMIT = 100
 
 
 class RedditFetcher:
@@ -92,9 +95,12 @@ class RedditFetcher:
                 client_secret=client_secret,
                 user_agent=user_agent
             )
-            # Test the connection
-            reddit.user.me()
-            print("Authenticated with Reddit API", file=sys.stderr)
+            # Verify the client works by checking read_only status
+            # Note: reddit.user.me() requires user login, but app-only auth is read-only
+            if reddit.read_only:
+                print("Authenticated with Reddit API (read-only mode)", file=sys.stderr)
+            else:
+                print("Authenticated with Reddit API", file=sys.stderr)
             return reddit
         except (ResponseException, OAuthException) as e:
             print(f"Warning: Reddit authentication failed: {e}", file=sys.stderr)
@@ -121,6 +127,22 @@ class RedditFetcher:
         dt = datetime.fromtimestamp(timestamp, tz=timezone.utc)
         return start <= dt <= end
 
+    def _get_attr(self, obj: Any, key: str, default: Any = None) -> Any:
+        """
+        Get attribute from dict or PRAW object uniformly.
+
+        Args:
+            obj: Dict or PRAW object
+            key: Attribute/key name
+            default: Default value if not found
+
+        Returns:
+            The attribute value or default
+        """
+        if isinstance(obj, dict):
+            return obj.get(key, default)
+        return getattr(obj, key, default)
+
     def _extract_post_data(self, post: Any, subreddit_name: str) -> Dict:
         """
         Extract relevant data from a Reddit post object.
@@ -132,48 +154,34 @@ class RedditFetcher:
         Returns:
             Normalized post data dictionary
         """
-        # Handle both PRAW objects and dicts
-        if isinstance(post, dict):
-            return {
-                'id': post.get('id', ''),
-                'title': post.get('title', ''),
-                'author': str(post.get('author', '[deleted]')),
-                'subreddit': subreddit_name,
-                'score': post.get('score', 0),
-                'upvote_ratio': post.get('upvote_ratio', 0),
-                'num_comments': post.get('num_comments', 0),
-                'created_utc': post.get('created_utc', 0),
-                'created_datetime': datetime.fromtimestamp(
-                    post.get('created_utc', 0), tz=timezone.utc
-                ).isoformat(),
-                'url': post.get('url', ''),
-                'permalink': f"https://reddit.com{post.get('permalink', '')}",
-                'selftext': post.get('selftext', '')[:2000],  # Limit length
-                'is_self': post.get('is_self', False),
-                'link_flair_text': post.get('link_flair_text', ''),
-                'comments': []  # Will be populated later
-            }
-        else:
-            # PRAW Submission object
-            return {
-                'id': post.id,
-                'title': post.title,
-                'author': str(post.author) if post.author else '[deleted]',
-                'subreddit': subreddit_name,
-                'score': post.score,
-                'upvote_ratio': post.upvote_ratio,
-                'num_comments': post.num_comments,
-                'created_utc': post.created_utc,
-                'created_datetime': datetime.fromtimestamp(
-                    post.created_utc, tz=timezone.utc
-                ).isoformat(),
-                'url': post.url,
-                'permalink': f"https://reddit.com{post.permalink}",
-                'selftext': (post.selftext or '')[:2000],
-                'is_self': post.is_self,
-                'link_flair_text': post.link_flair_text or '',
-                'comments': []
-            }
+        get = lambda k, d=None: self._get_attr(post, k, d)
+
+        author = get('author')
+        author_str = str(author) if author else '[deleted]'
+
+        created_utc = get('created_utc', 0)
+        selftext = get('selftext', '') or ''
+        link_flair = get('link_flair_text', '') or ''
+
+        return {
+            'id': get('id', ''),
+            'title': get('title', ''),
+            'author': author_str,
+            'subreddit': subreddit_name,
+            'score': get('score', 0),
+            'upvote_ratio': get('upvote_ratio', 0),
+            'num_comments': get('num_comments', 0),
+            'created_utc': created_utc,
+            'created_datetime': datetime.fromtimestamp(
+                created_utc, tz=timezone.utc
+            ).isoformat(),
+            'url': get('url', ''),
+            'permalink': f"https://reddit.com{get('permalink', '')}",
+            'selftext': selftext[:MAX_SELFTEXT_LENGTH],
+            'is_self': get('is_self', False),
+            'link_flair_text': link_flair,
+            'comments': []  # Will be populated later
+        }
 
     def _extract_comment_data(self, comment: Any) -> Optional[Dict]:
         """
@@ -186,31 +194,26 @@ class RedditFetcher:
             Normalized comment data dictionary or None if invalid
         """
         try:
-            if isinstance(comment, dict):
-                body = comment.get('body', '')
-                if not body or body == '[deleted]' or body == '[removed]':
-                    return None
-                return {
-                    'id': comment.get('id', ''),
-                    'author': str(comment.get('author', '[deleted]')),
-                    'body': body[:1000],  # Limit length
-                    'score': comment.get('score', 0),
-                    'created_utc': comment.get('created_utc', 0),
-                }
-            else:
-                # PRAW Comment object
-                if not hasattr(comment, 'body'):
-                    return None
-                body = comment.body
-                if not body or body == '[deleted]' or body == '[removed]':
-                    return None
-                return {
-                    'id': comment.id,
-                    'author': str(comment.author) if comment.author else '[deleted]',
-                    'body': body[:1000],
-                    'score': comment.score,
-                    'created_utc': comment.created_utc,
-                }
+            get = lambda k, d=None: self._get_attr(comment, k, d)
+
+            # For PRAW objects, check if body attribute exists
+            if not isinstance(comment, dict) and not hasattr(comment, 'body'):
+                return None
+
+            body = get('body', '')
+            if not body or body in ('[deleted]', '[removed]'):
+                return None
+
+            author = get('author')
+            author_str = str(author) if author else '[deleted]'
+
+            return {
+                'id': get('id', ''),
+                'author': author_str,
+                'body': body[:MAX_COMMENT_BODY_LENGTH],
+                'score': get('score', 0),
+                'created_utc': get('created_utc', 0),
+            }
         except AttributeError:
             return None
 
@@ -315,7 +318,7 @@ class RedditFetcher:
             # Fetch from multiple listings for better coverage
             for listing in ['new', 'hot', 'top']:
                 url = f"https://www.reddit.com/r/{subreddit_name}/{listing}.json"
-                params = {'limit': min(100, self.max_posts)}
+                params = {'limit': min(REDDIT_API_MAX_LIMIT, self.max_posts)}
                 if listing == 'top':
                     params['t'] = 'week'
 
