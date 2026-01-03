@@ -28,10 +28,33 @@ import math
 import sys
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Dict, List, Tuple
+from typing import Dict, List
 from statistics import median
 
 import yaml
+
+# Scoring formula constants
+ENGAGEMENT_SCORE_DIVISOR = 2
+COMMENTS_SCORE_DIVISOR = 3
+DEFAULT_MEDIAN_SCORE = 10
+
+# Content length thresholds for scoring
+CONTENT_LENGTH_VERY_SHORT = 50
+CONTENT_LENGTH_BRIEF = 200
+CONTENT_LENGTH_GOOD = 1000
+CONTENT_LENGTH_SUBSTANTIAL = 3000
+
+# Content length scores
+CONTENT_SCORE_VERY_SHORT = 0.3
+CONTENT_SCORE_BRIEF = 0.5
+CONTENT_SCORE_GOOD = 0.8
+CONTENT_SCORE_SUBSTANTIAL = 1.0
+CONTENT_SCORE_WALL_OF_TEXT = 0.7
+
+# Formatting limits for Claude
+MAX_SELFTEXT_LENGTH = 500
+MAX_COMMENT_BODY_LENGTH = 300
+MAX_TOP_COMMENTS = 5
 
 
 def compute_engagement_score(score: int, median_score: float) -> float:
@@ -56,7 +79,7 @@ def compute_engagement_score(score: int, median_score: float) -> float:
     log_median = math.log10(max(median_score, 1) + 1)
 
     # Normalize: 1x median = 0.5, 10x median = ~0.75, 100x median = ~1.0
-    normalized = log_score / (log_median + 2)
+    normalized = log_score / (log_median + ENGAGEMENT_SCORE_DIVISOR)
     return min(1.0, normalized)
 
 
@@ -77,7 +100,7 @@ def compute_comments_score(num_comments: int) -> float:
         return 0.0
 
     # Diminishing returns: 10 comments = ~0.5, 100 = ~0.75, 1000 = ~0.9
-    return min(1.0, math.log10(num_comments + 1) / 3)
+    return min(1.0, math.log10(num_comments + 1) / COMMENTS_SCORE_DIVISOR)
 
 
 def compute_recency_score(created_utc: float, start: datetime, end: datetime) -> float:
@@ -121,16 +144,16 @@ def compute_content_score(selftext: str, title: str) -> float:
     """
     total_length = len(selftext) + len(title)
 
-    if total_length < 50:
-        return 0.3  # Very short, might be just a link
-    elif total_length < 200:
-        return 0.5  # Brief but has content
-    elif total_length < 1000:
-        return 0.8  # Good length for discussion
-    elif total_length < 3000:
-        return 1.0  # Substantial content
+    if total_length < CONTENT_LENGTH_VERY_SHORT:
+        return CONTENT_SCORE_VERY_SHORT
+    elif total_length < CONTENT_LENGTH_BRIEF:
+        return CONTENT_SCORE_BRIEF
+    elif total_length < CONTENT_LENGTH_GOOD:
+        return CONTENT_SCORE_GOOD
+    elif total_length < CONTENT_LENGTH_SUBSTANTIAL:
+        return CONTENT_SCORE_SUBSTANTIAL
     else:
-        return 0.7  # Wall of text, slightly penalize
+        return CONTENT_SCORE_WALL_OF_TEXT
 
 
 def compute_ratio_score(upvote_ratio: float) -> float:
@@ -217,7 +240,7 @@ def compute_subreddit_medians(posts: List[Dict]) -> Dict[str, float]:
         subreddit_scores[sr].append(post['score'])
 
     return {
-        sr: median(scores) if scores else 10
+        sr: median(scores) if scores else DEFAULT_MEDIAN_SCORE
         for sr, scores in subreddit_scores.items()
     }
 
@@ -236,21 +259,21 @@ def format_post_for_claude(post: Dict) -> Dict:
     """
     # Truncate long text
     selftext = post.get('selftext', '')
-    if len(selftext) > 500:
-        selftext = selftext[:500] + "..."
+    if len(selftext) > MAX_SELFTEXT_LENGTH:
+        selftext = selftext[:MAX_SELFTEXT_LENGTH] + "..."
 
     # Select top comments by score
     comments = sorted(
         post.get('comments', []),
         key=lambda c: c.get('score', 0),
         reverse=True
-    )[:5]
+    )[:MAX_TOP_COMMENTS]
 
     formatted_comments = [
         {
             'author': c['author'],
             'score': c['score'],
-            'body': c['body'][:300] + "..." if len(c['body']) > 300 else c['body']
+            'body': c['body'][:MAX_COMMENT_BODY_LENGTH] + "..." if len(c['body']) > MAX_COMMENT_BODY_LENGTH else c['body']
         }
         for c in comments
     ]
@@ -313,16 +336,16 @@ def preprocess_posts(
 
     # Score all posts
     for post in posts:
-        median_score = medians.get(post['subreddit'], 10)
+        median_score = medians.get(post['subreddit'], DEFAULT_MEDIAN_SCORE)
         post['heuristic_score'] = compute_heuristic_score(
             post, median_score, start, end, weights
         )
 
-    # Sort by heuristic score
-    posts.sort(key=lambda x: x['heuristic_score'], reverse=True)
+    # Sort by heuristic score (use sorted() to avoid mutating input)
+    sorted_posts = sorted(posts, key=lambda x: x['heuristic_score'], reverse=True)
 
     # Take top N
-    top_posts = posts[:top_n]
+    top_posts = sorted_posts[:top_n]
 
     # Format for Claude
     formatted_posts = [format_post_for_claude(p) for p in top_posts]
