@@ -27,3 +27,8 @@ Thumbs.db
 # If you add credentials to config.yaml, consider using a separate secrets file
 secrets.yaml
 .env.local
+
+# Local config variations (personal/environment-specific configs)
+# Examples: config.local.yaml, config.dev.local.yaml, myconfig.local.yaml
+*.local.yaml
+*.local.yml

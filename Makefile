@@ -22,6 +22,7 @@
 # Parameters:
 #   TOP=N     - Number of posts in final report (default: 10)
 #   FETCH=N   - Number of source posts to analyze (default: 50)
+#   CONFIG=P  - Path to config file (default: config.yaml)
 #
 # Report generation:
 #   make report               - Re-generate report from existing data
@@ -35,6 +36,9 @@ all: help
 
 # Virtual environment directory
 VENV_DIR ?= venv
+
+# Config file location
+CONFIG ?= config.yaml
 
 # Python command - prefer venv if it exists, otherwise system python
 # This is evaluated at runtime, not at Makefile parse time
@@ -96,10 +100,10 @@ fetch:
 	@echo "Output directory: $(OUTPUT_DIR)"
 	@mkdir -p $(OUTPUT_DIR)
 	@echo "Fetching Reddit posts..."
-	$(PYTHON) scripts/fetch_reddit.py $(TIME_ARGS) $(SUBREDDIT_ARG) --output-dir $(OUTPUT_DIR)
+	$(PYTHON) scripts/fetch_reddit.py $(TIME_ARGS) $(SUBREDDIT_ARG) --config $(CONFIG) --output-dir $(OUTPUT_DIR)
 	@echo ""
 	@echo "Preprocessing posts..."
-	$(PYTHON) scripts/preprocess.py --top $(FETCH) --output-dir $(OUTPUT_DIR)
+	$(PYTHON) scripts/preprocess.py --config $(CONFIG) --top $(FETCH) --output-dir $(OUTPUT_DIR)
 	@echo ""
 	@echo "Updating latest symlink..."
 	@rm -f output/latest
@@ -125,24 +129,24 @@ daily:
 	@START=$$(date -u -v-1d +%Y-%m-%dT%H:%M:%SZ 2>/dev/null || date -u -d "1 day ago" +%Y-%m-%dT%H:%M:%SZ); \
 	END=$$(date -u +%Y-%m-%dT%H:%M:%SZ); \
 	echo "Fetching daily data: $$START to $$END"; \
-	$(MAKE) fetch START=$$START END=$$END MODE=daily SUBREDDIT=$(SUBREDDIT) TOP=$(TOP)
-	@$(MAKE) report
+	$(MAKE) fetch START=$$START END=$$END MODE=daily SUBREDDIT=$(SUBREDDIT) TOP=$(TOP) CONFIG=$(CONFIG)
+	@$(MAKE) report CONFIG=$(CONFIG)
 
 ## weekly: Fetch last 7 days and generate report
 weekly:
 	@START=$$(date -u -v-7d +%Y-%m-%dT%H:%M:%SZ 2>/dev/null || date -u -d "7 days ago" +%Y-%m-%dT%H:%M:%SZ); \
 	END=$$(date -u +%Y-%m-%dT%H:%M:%SZ); \
 	echo "Fetching weekly data: $$START to $$END"; \
-	$(MAKE) fetch START=$$START END=$$END MODE=weekly SUBREDDIT=$(SUBREDDIT) TOP=$(TOP)
-	@$(MAKE) report
+	$(MAKE) fetch START=$$START END=$$END MODE=weekly SUBREDDIT=$(SUBREDDIT) TOP=$(TOP) CONFIG=$(CONFIG)
+	@$(MAKE) report CONFIG=$(CONFIG)
 
 ## monthly: Fetch last 30 days and generate report
 monthly:
 	@START=$$(date -u -v-30d +%Y-%m-%dT%H:%M:%SZ 2>/dev/null || date -u -d "30 days ago" +%Y-%m-%dT%H:%M:%SZ); \
 	END=$$(date -u +%Y-%m-%dT%H:%M:%SZ); \
 	echo "Fetching monthly data: $$START to $$END"; \
-	$(MAKE) fetch START=$$START END=$$END MODE=monthly SUBREDDIT=$(SUBREDDIT) TOP=$(TOP)
-	@$(MAKE) report
+	$(MAKE) fetch START=$$START END=$$END MODE=monthly SUBREDDIT=$(SUBREDDIT) TOP=$(TOP) CONFIG=$(CONFIG)
+	@$(MAKE) report CONFIG=$(CONFIG)
 
 ## single: Fetch top posts from a single subreddit and generate report (use SUBREDDIT=name TOP=N)
 single:
@@ -154,8 +158,8 @@ endif
 	@START=$$(date -u -v-7d +%Y-%m-%dT%H:%M:%SZ 2>/dev/null || date -u -d "7 days ago" +%Y-%m-%dT%H:%M:%SZ); \
 	END=$$(date -u +%Y-%m-%dT%H:%M:%SZ); \
 	echo "Fetching top $(TOP) posts from r/$(SUBREDDIT): $$START to $$END"; \
-	$(MAKE) fetch START=$$START END=$$END SUBREDDIT=$(SUBREDDIT) TOP=$(TOP) MODE=single
-	@$(MAKE) report
+	$(MAKE) fetch START=$$START END=$$END SUBREDDIT=$(SUBREDDIT) TOP=$(TOP) MODE=single CONFIG=$(CONFIG)
+	@$(MAKE) report CONFIG=$(CONFIG)
 
 ## report: Generate digest report using Claude Code (requires data in output/latest)
 report:
@@ -167,7 +171,7 @@ report:
 	@echo "Generating digest report with Claude Code..."
 	@START_TIME=$$(date +%s); \
 	claude --print --model sonnet --verbose --dangerously-skip-permissions --output-format stream-json \
-		"Read the files $(CURDIR)/output/latest/processed_posts.json, $(CURDIR)/agents/weekly_digest_agent.md, and $(CURDIR)/config.yaml, then generate the digest report following the agent instructions. Include the top $(TOP) posts in the report. Save it to $(CURDIR)/output/latest/report.md" \
+		"Read the files $(CURDIR)/output/latest/processed_posts.json, $(CURDIR)/agents/weekly_digest_agent.md, and $(CURDIR)/$(CONFIG), then generate the digest report following the agent instructions. Include the top $(TOP) posts in the report. Save it to $(CURDIR)/output/latest/report.md" \
 		| $(PYTHON) scripts/format_progress.py; \
 	END_TIME=$$(date +%s); \
 	ELAPSED=$$((END_TIME - START_TIME)); \
@@ -187,7 +191,7 @@ report-interactive:
 		exit 1; \
 	fi
 	@echo "Launching Claude Code interactively..."
-	@claude "Read the files output/latest/processed_posts.json, agents/weekly_digest_agent.md, and config.yaml, then generate the digest report following the agent instructions and save it to output/latest/report.md"
+	@claude "Read the files output/latest/processed_posts.json, agents/weekly_digest_agent.md, and $(CONFIG), then generate the digest report following the agent instructions and save it to output/latest/report.md"
 	@echo ""
 	@echo "=========================================="
 	@echo "Report generated: output/latest/report.md"
@@ -214,4 +218,5 @@ help:
 	@echo "  make fetch START=2025-01-01T00:00:00Z END=2025-01-08T00:00:00Z"
 	@echo "  make single SUBREDDIT=ClaudeAI TOP=10"
 	@echo "  make weekly SUBREDDIT=LocalLLaMA TOP=5"
+	@echo "  make weekly CONFIG=config.prod.yaml"
 	@echo ""
