@@ -22,6 +22,11 @@ import yaml
 from dateutil import parser as date_parser
 from dateutil.tz import tzutc
 
+# Time window defaults and limits
+DEFAULT_DAYS = 7
+CLOCK_SKEW_BUFFER_HOURS = 1
+LARGE_WINDOW_WARNING_DAYS = 90
+
 
 def parse_iso_timestamp(timestamp_str: str) -> datetime:
     """
@@ -52,7 +57,7 @@ def parse_iso_timestamp(timestamp_str: str) -> datetime:
         raise ValueError(f"Cannot parse timestamp '{timestamp_str}': {e}")
 
 
-def get_default_time_window(days: int = 7) -> Tuple[datetime, datetime]:
+def get_default_time_window(days: int = DEFAULT_DAYS) -> Tuple[datetime, datetime]:
     """
     Get the default time window: last N days ending now.
 
@@ -82,12 +87,12 @@ def validate_time_window(start: datetime, end: datetime) -> None:
         raise ValueError(f"Start time ({start}) must be before end time ({end})")
 
     now = datetime.now(timezone.utc)
-    if end > now + timedelta(hours=1):  # Allow 1 hour buffer for clock skew
+    if end > now + timedelta(hours=CLOCK_SKEW_BUFFER_HOURS):
         raise ValueError(f"End time ({end}) cannot be in the future")
 
-    # Warn if window is very large (> 90 days)
+    # Warn if window is very large
     window_days = (end - start).days
-    if window_days > 90:
+    if window_days > LARGE_WINDOW_WARNING_DAYS:
         print(f"Warning: Large time window ({window_days} days). This may take a while.",
               file=sys.stderr)
 
@@ -115,7 +120,7 @@ def get_time_window(
     """
     config = config or {}
     time_config = config.get('time_window', {})
-    default_days = time_config.get('default_days', 7)
+    default_days = time_config.get('default_days', DEFAULT_DAYS)
 
     # Determine start time
     start = None
