@@ -20,14 +20,12 @@ subreddits:
   - ClaudeCode
   - LangChain
   - LlamaIndex
-  - LlamaIndex
   - AIagents
   - OpenSourceAI
   - OpenAI
   - ClaudeAI
   - StableDiffusion
   - SelfHostedAI
-  - ClaudeCode
 
 # Default time window (used if no CLI args provided)
 # Format: ISO-8601 (e.g., 2025-01-01T00:00:00Z)
