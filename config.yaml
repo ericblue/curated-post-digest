@@ -13,19 +13,24 @@ reddit:
 # Subreddits to monitor
 # Add or remove subreddits as desired (without the r/ prefix)
 subreddits:
+  - ArtificialInteligence
   - MachineLearning
   - LocalLLaMA
   - LLM
   - mlOps
   - ClaudeCode
+  - ClaudeAI
   - LangChain
   - LlamaIndex
   - AIagents
   - OpenSourceAI
   - OpenAI
-  - ClaudeAI
   - StableDiffusion
-  - SelfHostedAI
+  - LocalLLM
+  - AI_Agents
+  - AgentsOfAI
+  - ChatGPT
+  - singularity
 
 # Default time window (used if no CLI args provided)
 # Format: ISO-8601 (e.g., 2025-01-01T00:00:00Z)
