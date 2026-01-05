@@ -212,6 +212,93 @@ def load_config(config_path: str = "config.yaml") -> dict:
         return {}
 
 
+def validate_config(config: dict) -> None:
+    """
+    Validate configuration values.
+
+    Checks for:
+    - Scoring weights that sum to approximately 1.0
+    - Valid numeric ranges for thresholds and scores
+    - Invalid or missing critical values
+
+    Args:
+        config: Configuration dictionary to validate
+
+    Raises:
+        ValueError: If configuration is invalid
+    """
+    # Validate scoring weights (only heuristic scoring, not Claude-assessed)
+    scoring = config.get('scoring', {})
+    weight_sum = (
+        scoring.get('engagement_weight', 0.3) +
+        scoring.get('comments_weight', 0.25) +
+        scoring.get('recency_weight', 0.2) +
+        scoring.get('content_weight', 0.15) +
+        scoring.get('ratio_weight', 0.1)
+    )
+    # Note: novelty_weight and relevance_weight are Claude-assessed, not part of heuristic
+
+    if abs(weight_sum - 1.0) > 0.1:  # Allow 10% tolerance
+        print(f"Warning: Heuristic scoring weights sum to {weight_sum:.2f}, expected ~1.0",
+              file=sys.stderr)
+
+    # Validate content thresholds
+    thresholds = config.get('content_thresholds', {})
+    for key in ['very_short', 'brief', 'good', 'substantial']:
+        value = thresholds.get(key)
+        if value is not None and value < 0:
+            raise ValueError(f"content_thresholds.{key} must be positive, got {value}")
+
+    # Ensure thresholds are in ascending order
+    if all(key in thresholds for key in ['very_short', 'brief', 'good', 'substantial']):
+        if (thresholds['very_short'] >= thresholds['brief'] or
+            thresholds['brief'] >= thresholds['good'] or
+            thresholds['good'] >= thresholds['substantial']):
+            raise ValueError("content_thresholds must be in ascending order")
+
+    # Validate content scores are between 0 and 1
+    scores = config.get('content_scores', {})
+    for key, value in scores.items():
+        if not 0 <= value <= 1:
+            raise ValueError(f"content_scores.{key} must be between 0 and 1, got {value}")
+
+    # Validate formatting limits
+    formatting = config.get('formatting', {})
+    for key in ['max_selftext_length', 'max_comment_body_length', 'max_top_comments']:
+        value = formatting.get(key)
+        if value is not None and value < 0:
+            raise ValueError(f"formatting.{key} must be positive, got {value}")
+
+    # Validate fetch settings
+    fetch = config.get('fetch', {})
+    if fetch.get('max_posts_per_subreddit', 0) < 0:
+        raise ValueError("fetch.max_posts_per_subreddit must be positive")
+    if fetch.get('max_comments_per_post', 0) < 0:
+        raise ValueError("fetch.max_comments_per_post must be positive")
+    if fetch.get('min_score', 0) < 0:
+        raise ValueError("fetch.min_score must be positive")
+    if fetch.get('rate_limit_delay', 0) < 0:
+        raise ValueError("fetch.rate_limit_delay must be positive")
+
+    # Validate subreddits list
+    subreddits = config.get('subreddits', [])
+    if not isinstance(subreddits, list):
+        raise ValueError("subreddits must be a list")
+
+    # Check for duplicate subreddits (case-insensitive)
+    seen = set()
+    duplicates = []
+    for sub in subreddits:
+        sub_lower = sub.lower()
+        if sub_lower in seen:
+            duplicates.append(sub)
+        seen.add(sub_lower)
+
+    if duplicates:
+        print(f"Warning: Duplicate subreddits found (case-insensitive): {duplicates}",
+              file=sys.stderr)
+
+
 def main():
     """
     CLI interface for testing time window parsing.
