@@ -5,15 +5,20 @@
 # Reddit API credentials (required for authenticated access)
 # Get yours at: https://www.reddit.com/prefs/apps
 # For unauthenticated access (rate limited), leave these empty
+#
+# Credentials can be provided via:
+# 1. This config file (values below)
+# 2. Environment variables: REDDIT_CLIENT_ID, REDDIT_CLIENT_SECRET, REDDIT_USER_AGENT
+#    Environment variables take precedence over config file values
 reddit:
-  client_id: ""
-  client_secret: ""
-  user_agent: "AI-Reddit-Digest/1.0"
+  client_id: ""  # Or set REDDIT_CLIENT_ID environment variable
+  client_secret: ""  # Or set REDDIT_CLIENT_SECRET environment variable
+  user_agent: "AI-Reddit-Digest/1.0"  # Or set REDDIT_USER_AGENT environment variable
 
 # Subreddits to monitor
 # Add or remove subreddits as desired (without the r/ prefix)
 subreddits:
-  - ArtificialInteligence
+  - ArtificialIntelligence
   - MachineLearning
   - LocalLLaMA
   - LLM
@@ -54,14 +59,48 @@ fetch:
 # Scoring weights for "interesting" heuristic
 # These affect how posts are ranked (higher = more important)
 scoring:
+  # Heuristic scoring weights (used in compute_heuristic_score)
   # Weight for Reddit score (upvotes - downvotes)
   engagement_weight: 0.3
   # Weight for comment count
   comments_weight: 0.25
+  # Weight for recency (fresher content scores higher)
+  recency_weight: 0.2
+  # Weight for content length (meaningful content)
+  content_weight: 0.15
+  # Weight for upvote ratio (quality indicator)
+  ratio_weight: 0.1
+  # Claude-assessed weights (used for final scoring by Claude)
   # Weight for novelty (Claude-assessed)
   novelty_weight: 0.25
   # Weight for relevance to AI/LLM topics (Claude-assessed)
   relevance_weight: 0.2
+
+# Content length thresholds for scoring (in characters)
+# These define the boundaries for content quality scoring
+content_thresholds:
+  very_short: 50    # Posts below this are low quality
+  brief: 200        # Brief but acceptable
+  good: 1000        # Ideal length
+  substantial: 3000 # Long but not overwhelming
+
+# Content length scores (0-1) for each threshold
+content_scores:
+  very_short: 0.3   # Too short
+  brief: 0.5        # Acceptable
+  good: 0.8         # Ideal
+  substantial: 1.0  # Excellent
+  wall_of_text: 0.7 # Too long
+
+# Formatting limits for Claude processing
+# These control how much text is sent to Claude (to reduce token usage)
+formatting:
+  # Maximum post body length to include
+  max_selftext_length: 500
+  # Maximum comment body length to include
+  max_comment_body_length: 300
+  # Number of top comments to include per post
+  max_top_comments: 5
 
 # Topics of personal interest (used by Claude for relevance scoring)
 interests:

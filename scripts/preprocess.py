@@ -33,28 +33,38 @@ from statistics import median
 
 import yaml
 
+# Add parent directory to path for imports
+sys.path.insert(0, str(Path(__file__).parent))
+from parse_time_window import validate_config
+
 # Scoring formula constants
 ENGAGEMENT_SCORE_DIVISOR = 2
 COMMENTS_SCORE_DIVISOR = 3
 DEFAULT_MEDIAN_SCORE = 10
 
-# Content length thresholds for scoring
-CONTENT_LENGTH_VERY_SHORT = 50
-CONTENT_LENGTH_BRIEF = 200
-CONTENT_LENGTH_GOOD = 1000
-CONTENT_LENGTH_SUBSTANTIAL = 3000
+# Default content thresholds (used if not in config)
+DEFAULT_CONTENT_THRESHOLDS = {
+    'very_short': 50,
+    'brief': 200,
+    'good': 1000,
+    'substantial': 3000
+}
 
-# Content length scores
-CONTENT_SCORE_VERY_SHORT = 0.3
-CONTENT_SCORE_BRIEF = 0.5
-CONTENT_SCORE_GOOD = 0.8
-CONTENT_SCORE_SUBSTANTIAL = 1.0
-CONTENT_SCORE_WALL_OF_TEXT = 0.7
+# Default content scores (used if not in config)
+DEFAULT_CONTENT_SCORES = {
+    'very_short': 0.3,
+    'brief': 0.5,
+    'good': 0.8,
+    'substantial': 1.0,
+    'wall_of_text': 0.7
+}
 
-# Formatting limits for Claude
-MAX_SELFTEXT_LENGTH = 500
-MAX_COMMENT_BODY_LENGTH = 300
-MAX_TOP_COMMENTS = 5
+# Default formatting limits (used if not in config)
+DEFAULT_FORMATTING = {
+    'max_selftext_length': 500,
+    'max_comment_body_length': 300,
+    'max_top_comments': 5
+}
 
 
 def compute_engagement_score(score: int, median_score: float) -> float:
@@ -128,7 +138,7 @@ def compute_recency_score(created_utc: float, start: datetime, end: datetime) ->
     return max(0.0, min(1.0, time_since_start / window_duration))
 
 
-def compute_content_score(selftext: str, title: str) -> float:
+def compute_content_score(selftext: str, title: str, config: Dict) -> float:
     """
     Compute content quality score based on length (0-1).
 
@@ -138,22 +148,26 @@ def compute_content_score(selftext: str, title: str) -> float:
     Args:
         selftext: Post body text
         title: Post title
+        config: Configuration dictionary with content_thresholds and content_scores
 
     Returns:
         Score between 0 and 1
     """
+    thresholds = config.get('content_thresholds', DEFAULT_CONTENT_THRESHOLDS)
+    scores = config.get('content_scores', DEFAULT_CONTENT_SCORES)
+
     total_length = len(selftext) + len(title)
 
-    if total_length < CONTENT_LENGTH_VERY_SHORT:
-        return CONTENT_SCORE_VERY_SHORT
-    elif total_length < CONTENT_LENGTH_BRIEF:
-        return CONTENT_SCORE_BRIEF
-    elif total_length < CONTENT_LENGTH_GOOD:
-        return CONTENT_SCORE_GOOD
-    elif total_length < CONTENT_LENGTH_SUBSTANTIAL:
-        return CONTENT_SCORE_SUBSTANTIAL
+    if total_length < thresholds.get('very_short', DEFAULT_CONTENT_THRESHOLDS['very_short']):
+        return scores.get('very_short', DEFAULT_CONTENT_SCORES['very_short'])
+    elif total_length < thresholds.get('brief', DEFAULT_CONTENT_THRESHOLDS['brief']):
+        return scores.get('brief', DEFAULT_CONTENT_SCORES['brief'])
+    elif total_length < thresholds.get('good', DEFAULT_CONTENT_THRESHOLDS['good']):
+        return scores.get('good', DEFAULT_CONTENT_SCORES['good'])
+    elif total_length < thresholds.get('substantial', DEFAULT_CONTENT_THRESHOLDS['substantial']):
+        return scores.get('substantial', DEFAULT_CONTENT_SCORES['substantial'])
     else:
-        return CONTENT_SCORE_WALL_OF_TEXT
+        return scores.get('wall_of_text', DEFAULT_CONTENT_SCORES['wall_of_text'])
 
 
 def compute_ratio_score(upvote_ratio: float) -> float:
@@ -178,7 +192,7 @@ def compute_heuristic_score(
     median_score: float,
     start: datetime,
     end: datetime,
-    weights: Dict
+    config: Dict
 ) -> float:
     """
     Compute the overall heuristic score (1-10) for a post.
@@ -190,23 +204,25 @@ def compute_heuristic_score(
         median_score: Median score for the subreddit
         start: Time window start
         end: Time window end
-        weights: Scoring weights from config
+        config: Full configuration dictionary with scoring weights
 
     Returns:
         Score from 1 to 10
     """
+    weights = config.get('scoring', {})
+
     engagement = compute_engagement_score(post['score'], median_score)
     comments = compute_comments_score(post['num_comments'])
     recency = compute_recency_score(post['created_utc'], start, end)
-    content = compute_content_score(post.get('selftext', ''), post['title'])
+    content = compute_content_score(post.get('selftext', ''), post['title'], config)
     ratio = compute_ratio_score(post.get('upvote_ratio', 0.5))
 
     # Get weights (use defaults if not specified)
     w_engagement = weights.get('engagement_weight', 0.3)
     w_comments = weights.get('comments_weight', 0.25)
-    w_recency = 0.2  # Fixed, not configurable for simplicity
-    w_content = 0.15
-    w_ratio = 0.1
+    w_recency = weights.get('recency_weight', 0.2)
+    w_content = weights.get('content_weight', 0.15)
+    w_ratio = weights.get('ratio_weight', 0.1)
 
     # Weighted sum
     raw_score = (
@@ -245,7 +261,7 @@ def compute_subreddit_medians(posts: List[Dict]) -> Dict[str, float]:
     }
 
 
-def format_post_for_claude(post: Dict) -> Dict:
+def format_post_for_claude(post: Dict, config: Dict) -> Dict:
     """
     Format a post for efficient Claude processing.
 
@@ -253,27 +269,33 @@ def format_post_for_claude(post: Dict) -> Dict:
 
     Args:
         post: Post data dictionary with heuristic_score
+        config: Configuration dictionary with formatting settings
 
     Returns:
         Streamlined post dictionary
     """
+    formatting = config.get('formatting', DEFAULT_FORMATTING)
+    max_selftext = formatting.get('max_selftext_length', DEFAULT_FORMATTING['max_selftext_length'])
+    max_comment = formatting.get('max_comment_body_length', DEFAULT_FORMATTING['max_comment_body_length'])
+    max_comments = formatting.get('max_top_comments', DEFAULT_FORMATTING['max_top_comments'])
+
     # Truncate long text
     selftext = post.get('selftext', '')
-    if len(selftext) > MAX_SELFTEXT_LENGTH:
-        selftext = selftext[:MAX_SELFTEXT_LENGTH] + "..."
+    if len(selftext) > max_selftext:
+        selftext = selftext[:max_selftext] + "..."
 
     # Select top comments by score
     comments = sorted(
         post.get('comments', []),
         key=lambda c: c.get('score', 0),
         reverse=True
-    )[:MAX_TOP_COMMENTS]
+    )[:max_comments]
 
     formatted_comments = [
         {
             'author': c['author'],
             'score': c['score'],
-            'body': c['body'][:MAX_COMMENT_BODY_LENGTH] + "..." if len(c['body']) > MAX_COMMENT_BODY_LENGTH else c['body']
+            'body': c['body'][:max_comment] + "..." if len(c['body']) > max_comment else c['body']
         }
         for c in comments
     ]
@@ -328,9 +350,6 @@ def preprocess_posts(
     start = datetime.fromisoformat(metadata['start_time'].replace('Z', '+00:00'))
     end = datetime.fromisoformat(metadata['end_time'].replace('Z', '+00:00'))
 
-    # Get scoring weights
-    weights = config.get('scoring', {})
-
     # Compute subreddit medians for normalization
     medians = compute_subreddit_medians(posts)
 
@@ -338,7 +357,7 @@ def preprocess_posts(
     for post in posts:
         median_score = medians.get(post['subreddit'], DEFAULT_MEDIAN_SCORE)
         post['heuristic_score'] = compute_heuristic_score(
-            post, median_score, start, end, weights
+            post, median_score, start, end, config
         )
 
     # Sort by heuristic score (use sorted() to avoid mutating input)
@@ -348,7 +367,7 @@ def preprocess_posts(
     top_posts = sorted_posts[:top_n]
 
     # Format for Claude
-    formatted_posts = [format_post_for_claude(p) for p in top_posts]
+    formatted_posts = [format_post_for_claude(p, config) for p in top_posts]
 
     return {
         'metadata': {
@@ -420,6 +439,13 @@ def main():
         print(f"Warning: Config not found at {args.config}, using defaults",
               file=sys.stderr)
         config = {}
+
+    # Validate config
+    try:
+        validate_config(config)
+    except ValueError as e:
+        print(f"Configuration error: {e}", file=sys.stderr)
+        sys.exit(1)
 
     # Load raw data
     try:

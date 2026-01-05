@@ -22,6 +22,7 @@ Output:
 
 import argparse
 import json
+import os
 import sys
 import time
 from datetime import datetime, timezone
@@ -34,7 +35,7 @@ from prawcore.exceptions import ResponseException, OAuthException
 
 # Add parent directory to path for imports
 sys.path.insert(0, str(Path(__file__).parent))
-from parse_time_window import get_time_window, load_config
+from parse_time_window import get_time_window, load_config, validate_config
 
 # Content length limits
 MAX_SELFTEXT_LENGTH = 2000
@@ -76,16 +77,35 @@ class RedditFetcher:
         """
         Initialize PRAW Reddit client if credentials are available.
 
+        Credentials are loaded from environment variables if set, otherwise from config.
+
+        Environment variables:
+            REDDIT_CLIENT_ID: Reddit API client ID
+            REDDIT_CLIENT_SECRET: Reddit API client secret
+            REDDIT_USER_AGENT: Custom user agent string
+
         Returns:
             praw.Reddit instance or None if credentials unavailable
         """
-        client_id = self.reddit_config.get('client_id', '').strip()
-        client_secret = self.reddit_config.get('client_secret', '').strip()
-        user_agent = self.reddit_config.get('user_agent', 'AI-Reddit-Digest/1.0')
+        # Check environment variables first (take precedence over config)
+        client_id = os.getenv('REDDIT_CLIENT_ID', '').strip()
+        client_secret = os.getenv('REDDIT_CLIENT_SECRET', '').strip()
+        user_agent = os.getenv('REDDIT_USER_AGENT', '').strip()
+
+        # Fall back to config values if env vars not set
+        if not client_id:
+            client_id = self.reddit_config.get('client_id', '').strip()
+        if not client_secret:
+            client_secret = self.reddit_config.get('client_secret', '').strip()
+        if not user_agent:
+            user_agent = self.reddit_config.get('user_agent', 'AI-Reddit-Digest/1.0')
 
         if not client_id or not client_secret:
             print("No Reddit API credentials found, using unauthenticated mode",
                   file=sys.stderr)
+            print("(Set REDDIT_CLIENT_ID and REDDIT_CLIENT_SECRET environment variables",
+                  file=sys.stderr)
+            print(" or add them to config.yaml)", file=sys.stderr)
             print("(Rate limits will be more restrictive)", file=sys.stderr)
             return None
 
@@ -477,6 +497,13 @@ def main():
 
     # Load config
     config = load_config(args.config)
+
+    # Validate config
+    try:
+        validate_config(config)
+    except ValueError as e:
+        print(f"Configuration error: {e}", file=sys.stderr)
+        sys.exit(1)
 
     # Override max_posts in config if CLI argument provided
     if args.max_posts is not None:
